@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Security Audit Scanner",
+  "description": "Automatically scans code files for exposed API keys, secrets, and credentials when security-related keywords are mentioned. Provides step-by-step remediation including environment variable migration, .gitignore updates, and git operations.",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "SECURITY AUDIT TRIGGERED - Perform comprehensive security scan:\n\n1. **SCAN PHASE**: Search all code files for potential secrets using these patterns:\n   - API Keys: `sk-...`, `pk_...`, `ghp_...`, `gho_...`\n   - Database URLs: `postgres://...`, `mysql://...`, `mongodb://...`\n   - JWT tokens: Long base64 strings in quotes\n   - AWS keys: `AKIA...`, access tokens\n   - Generic patterns: `password=`, `secret=`, `token=`, `key=`\n\n2. **ANALYSIS PHASE**: For each found secret:\n   - Identify the file and line number\n   - Determine the variable name and context\n   - Assess if it's a real secret vs test/placeholder\n\n3. **REMEDIATION PHASE**: For real secrets found:\n   - Replace hardcoded values with `os.getenv('VARIABLE_NAME')`\n   - Generate .env file content with the extracted values\n   - Ensure .env is in .gitignore and .dockerignore\n   - Provide specific git commands for secure commit\n\n4. **CRITICAL WARNING**: If secrets were previously committed, warn user to ROTATE THE KEYS immediately as git history retains them.\n\n5. **PREVENTION**: Suggest pre-commit hooks or CI/CD security scanning tools.\n\nScan the entire codebase systematically and provide a detailed security report with actionable remediation steps."
+  }
+}

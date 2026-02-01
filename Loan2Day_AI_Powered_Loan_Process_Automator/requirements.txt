@@ -1,0 +1,40 @@
+# Backend Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Agent Orchestration
+langgraph==0.0.62
+langchain-core>=0.2.0,<0.3.0
+langchain-community>=0.0.20
+
+# Database & Caching
+asyncpg==0.29.0
+sqlalchemy[asyncio]==2.0.23
+alembic==1.13.1
+redis[hiredis]==5.0.1
+
+# AI/ML Libraries
+numpy==1.24.4
+torch==2.1.1
+transformers==4.36.0
+
+# PDF Generation
+reportlab==4.0.7
+
+# Voice Processing
+twilio==8.10.0
+speechrecognition==3.10.0
+pydub==0.25.1
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-mock==3.12.0
+hypothesis==6.92.1
+
+# Development
+python-dotenv==1.0.0
+python-multipart==0.0.6
+httpx==0.25.2

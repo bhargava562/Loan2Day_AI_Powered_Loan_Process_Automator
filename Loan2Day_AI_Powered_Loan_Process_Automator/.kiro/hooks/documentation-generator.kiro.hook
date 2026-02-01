@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Documentation Generator",
+  "description": "Automatically generates documentation when user asks to \"document this,\" \"explain code,\" or \"generate readme\" with Google-style docstrings, Mermaid.js diagrams for Agents, FastAPI response schemas, and business logic explanations",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "The user is requesting documentation. Follow these rules:\n\n1. **Docstring Format:** Use Google-style docstrings for all Python functions\n2. **Architecture First:** If documenting an Agent (Master/Sales/Verification), always include a **Mermaid.js** state diagram showing the hand-off logic\n3. **API Specs:** For FastAPI routes, automatically generate the `responses` schema and example JSON bodies\n4. **No \"Fluff\":** Focus on the business logic. Explain *why* `LQM.calculate_emi()` is used instead of standard math operators (to prevent float errors)\n\nGenerate comprehensive documentation that follows these guidelines and focuses on the business logic and technical reasoning behind the code."
+  }
+}

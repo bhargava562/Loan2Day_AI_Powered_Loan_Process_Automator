@@ -1,0 +1,55 @@
+# Pre-commit hooks for Loan2Day security and code quality
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key
+        name: Detect Private Keys
+        description: Detects presence of private keys
+      - id: detect-aws-credentials
+        name: Detect AWS Credentials
+        description: Detects AWS credentials in files
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        name: Detect Secrets
+        description: Detects high entropy strings and other secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: |
+          (?x)^(
+            \.env\.example|
+            \.kiro/.*|
+            tests/.*|
+            README\.md
+          )$
+
+  - repo: https://github.com/psf/black
+    rev: 23.3.0
+    hooks:
+      - id: black
+        name: Black Code Formatter
+        language_version: python3.11
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.0.0
+    hooks:
+      - id: flake8
+        name: Flake8 Linter
+        args: ['--max-line-length=100', '--ignore=E203,W503']
+
+  - repo: local
+    hooks:
+      - id: lqm-decimal-check
+        name: LQM Decimal Type Check
+        entry: python
+        language: system
+        args: ['-c', 'import sys, re; sys.exit(1 if re.search(r"float\s*\(|Float\s*=|:\s*float", open(sys.argv[1]).read()) else 0)']
+        files: '^app/.*\.py$'
+        description: Ensures no float types are used for monetary calculations (LQM Standard)

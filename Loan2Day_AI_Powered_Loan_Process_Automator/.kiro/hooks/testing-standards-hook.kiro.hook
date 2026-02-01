@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Testing Standards Hook",
+  "description": "Automatically applies testing standards when user asks to write tests, validate, or create mocks. Uses pytest for backend and Jest/React Testing Library for frontend, creates mock services, includes Plan B test cases, and covers edge cases like Tanglish inputs and deepfake detection.",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "The user is requesting testing work. Apply these testing standards:\n\n**Framework Rules:**\n- Use `pytest` for backend testing\n- Use `Jest/React Testing Library` for frontend testing\n\n**Mocking Requirements:**\n- NEVER call real APIs in tests\n- Create `MockBureauService` and `MockBankingAPI` that return deterministic JSON responses\n- Mock all external dependencies\n\n**Required Test Cases:**\n1. **Plan B Test:** Generate a test where user fails initial criteria and verify the \"Plan B Calculation\" loop triggers\n2. **Edge Cases:** Include tests for:\n   - Tanglish/Mixed-language inputs (e.g., \"Loan venum 5 lakhs\")\n   - Deepfake image injections (mocked as high-noise tensors)\n   - Zero/Negative income values\n   - Boundary conditions and error states\n\n**Test Structure:**\n- Arrange: Set up mocks and test data\n- Act: Execute the functionality\n- Assert: Verify expected behavior including error handling\n\nImplement comprehensive test coverage following these standards."
+  }
+}

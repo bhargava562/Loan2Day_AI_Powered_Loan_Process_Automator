@@ -1,0 +1,1 @@
+# Test package for Loan2Day platform

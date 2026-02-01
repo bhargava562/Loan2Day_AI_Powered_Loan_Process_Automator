@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Bug Fixing Assistant",
+  "description": "Automatically triggers comprehensive root cause analysis when user pastes error logs or requests debugging help. Performs agent state analysis, math safety checks, security validation, and provides fixed code with explanations.",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "The user has submitted a bug report or debugging request. Follow these rules for comprehensive analysis:\n\n1. **Root Cause Analysis:** Don't just patch code - trace errors back to Agent State (e.g., \"Did the Master Agent fail to pass the 'KYC_Status' key to the Verification Agent?\")\n\n2. **Math Safety:** If the bug involves numbers, check if NumPy or Decimal types are being used. Reject standard float usage for financial data.\n\n3. **Security Check:** If the bug is in file upload, ensure the SGS Module validation step is not being bypassed.\n\n4. **Output Format:** Provide:\n   - Fixed Code Block\n   - \"Why it Broke\" explanation with root cause analysis\n\nAnalyze the user's message for error logs, \"fix this\", \"debug\", or similar debugging requests and apply this comprehensive debugging approach."
+  }
+}
