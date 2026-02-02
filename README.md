@@ -4,7 +4,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-FF4B4B?style=for-the-badge)
 ![Redis](https://img.shields.io/badge/State-Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
-![Status](https://img.shields.io/badge/Status-Prototype-orange?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Testing-orange?style=for-the-badge)
 
 > **"From Laptop to Button Phone – Banking for Every Indian."**
 
