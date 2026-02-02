@@ -50,8 +50,15 @@ Thumbs.db
 
 # Logs
 *.log
-logs/
+logs/*.log
+logs/*.txt
 loan2day.log
+
+# Runtime directories (keep .gitkeep files)
+uploads/*
+!uploads/.gitkeep
+generated_pdfs/*
+!generated_pdfs/.gitkeep
 
 # Database
 *.db
