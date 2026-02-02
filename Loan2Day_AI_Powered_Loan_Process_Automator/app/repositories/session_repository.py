@@ -47,14 +47,14 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
     async def get_by_session_id(
         self, 
         db: AsyncSession, 
-        session_id: UUID
+        session_id: str
     ) -> Optional[AgentSession]:
         """
         Get session by session ID.
         
         Args:
             db: Database session
-            session_id: Session UUID
+            session_id: Session ID string
             
         Returns:
             Optional[AgentSession]: Session if found, None otherwise
@@ -122,7 +122,7 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
         db: AsyncSession,
         user_id: UUID,
         initial_state_data: Dict[str, Any],
-        session_id: Optional[UUID] = None
+        session_id: Optional[str] = None
     ) -> AgentSession:
         """
         Create new agent session with initial state.
@@ -131,7 +131,7 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
             db: Database session
             user_id: User UUID
             initial_state_data: Initial AgentState data
-            session_id: Optional session UUID (generated if not provided)
+            session_id: Optional session ID string (generated if not provided)
             
         Returns:
             AgentSession: Created session entity
@@ -139,18 +139,16 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
         logger.info(f"Creating new session for user: {user_id}")
         
         try:
+            import uuid
             session = AgentSession(
-                session_id=session_id or UUID(),
+                session_id=session_id or str(uuid.uuid4()),
                 user_id=user_id,
                 current_step=AgentStep.GREETING.value,
                 state_data=initial_state_data,
-                conversation_context={},
                 is_active=True,
                 last_activity_at=datetime.now(),
-                session_duration_seconds=0,
-                total_messages=0,
-                total_uploads=0,
-                plan_b_triggered=False
+                message_count=0,
+                total_processing_time_ms=0
             )
             
             db.add(session)
@@ -168,7 +166,7 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
     async def update_session_state(
         self,
         db: AsyncSession,
-        session_id: UUID,
+        session_id: str,
         state_data: Dict[str, Any],
         current_step: Optional[str] = None
     ) -> AgentSession:
@@ -177,7 +175,7 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
         
         Args:
             db: Database session
-            session_id: Session UUID
+            session_id: Session ID string
             state_data: Updated AgentState data
             current_step: New current step (optional)
             
@@ -201,13 +199,7 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
             
             # Update current step if provided
             if current_step:
-                session.previous_step = session.current_step
                 session.current_step = current_step
-            
-            # Calculate session duration
-            session.session_duration_seconds = int(
-                (session.last_activity_at - session.created_at).total_seconds()
-            )
             
             await db.commit()
             await db.refresh(session)
@@ -223,14 +215,14 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
     async def increment_message_count(
         self,
         db: AsyncSession,
-        session_id: UUID
+        session_id: str
     ) -> AgentSession:
         """
         Increment message count for session.
         
         Args:
             db: Database session
-            session_id: Session UUID
+            session_id: Session ID string
             
         Returns:
             AgentSession: Updated session entity
@@ -242,7 +234,7 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
             if not session:
                 raise NotFoundError(f"Session not found: {session_id}")
             
-            session.total_messages += 1
+            session.message_count += 1
             session.last_activity_at = datetime.now()
             
             await db.commit()
@@ -258,14 +250,14 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
     async def increment_upload_count(
         self,
         db: AsyncSession,
-        session_id: UUID
+        session_id: str
     ) -> AgentSession:
         """
         Increment upload count for session.
         
         Args:
             db: Database session
-            session_id: Session UUID
+            session_id: Session ID string
             
         Returns:
             AgentSession: Updated session entity
@@ -277,7 +269,8 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
             if not session:
                 raise NotFoundError(f"Session not found: {session_id}")
             
-            session.total_uploads += 1
+            # Note: Using total_processing_time_ms as a counter since there's no upload count field
+            session.total_processing_time_ms += 1
             session.last_activity_at = datetime.now()
             
             await db.commit()
@@ -293,14 +286,14 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
     async def trigger_plan_b(
         self,
         db: AsyncSession,
-        session_id: UUID
+        session_id: str
     ) -> AgentSession:
         """
         Mark session as having Plan B logic triggered.
         
         Args:
             db: Database session
-            session_id: Session UUID
+            session_id: Session ID string
             
         Returns:
             AgentSession: Updated session entity
@@ -312,9 +305,15 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
             if not session:
                 raise NotFoundError(f"Session not found: {session_id}")
             
-            session.plan_b_triggered = True
+            # Update current step to Plan B and mark as triggered
             session.current_step = AgentStep.PLAN_B.value
             session.last_activity_at = datetime.now()
+            
+            # Store Plan B trigger in state data
+            if session.state_data is None:
+                session.state_data = {}
+            session.state_data['plan_b_triggered'] = True
+            session.state_data['plan_b_triggered_at'] = datetime.now().isoformat()
             
             await db.commit()
             await db.refresh(session)
@@ -330,14 +329,14 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
     async def deactivate_session(
         self,
         db: AsyncSession,
-        session_id: UUID
+        session_id: str
     ) -> AgentSession:
         """
         Deactivate session (mark as inactive).
         
         Args:
             db: Database session
-            session_id: Session UUID
+            session_id: Session ID string
             
         Returns:
             AgentSession: Updated session entity
@@ -351,11 +350,6 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
             
             session.is_active = False
             session.last_activity_at = datetime.now()
-            
-            # Calculate final session duration
-            session.session_duration_seconds = int(
-                (session.last_activity_at - session.created_at).total_seconds()
-            )
             
             await db.commit()
             await db.refresh(session)
@@ -486,26 +480,26 @@ class SessionRepository(BaseRepository[AgentSession, AgentState, AgentState]):
             )
             step_stats = dict(step_stats_result.all())
             
-            # Plan B statistics
+            # Plan B statistics (check state_data for plan_b_triggered)
             plan_b_stats_result = await db.execute(
                 select(func.count(AgentSession.session_id))
-                .where(AgentSession.plan_b_triggered == True)
+                .where(AgentSession.state_data.op('->>')('plan_b_triggered') == 'true')
             )
             plan_b_sessions = plan_b_stats_result.scalar()
             
-            # Average session duration
-            avg_duration_result = await db.execute(
-                select(func.avg(AgentSession.session_duration_seconds))
+            # Average message count
+            avg_messages_result = await db.execute(
+                select(func.avg(AgentSession.message_count))
                 .where(AgentSession.is_active == False)  # Only completed sessions
             )
-            avg_duration = avg_duration_result.scalar() or 0
+            avg_messages = avg_messages_result.scalar() or 0
             
             statistics = {
                 "total_sessions": total_sessions,
                 "active_sessions": active_sessions,
                 "step_distribution": step_stats,
                 "plan_b_triggered_sessions": plan_b_sessions,
-                "average_session_duration_seconds": float(avg_duration),
+                "average_messages_per_session": float(avg_messages),
                 "plan_b_conversion_rate": (
                     (plan_b_sessions / total_sessions * 100) if total_sessions > 0 else 0
                 )

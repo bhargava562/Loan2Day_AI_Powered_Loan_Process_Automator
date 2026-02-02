@@ -33,8 +33,9 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, validator
 
 # Import core modules
-from app.services.pdf_service import PDFService, SanctionLetterData
+from app.services.pdf_service import PDFService
 from app.services.session_service import SessionService
+from app.core.dependencies import get_pdf_service, get_session_service
 from app.models.pydantic_models import AgentState
 from app.core.config import settings
 
@@ -44,9 +45,7 @@ logger = logging.getLogger(__name__)
 # Create router
 router = APIRouter()
 
-# Initialize services
-pdf_service = PDFService()
-session_service = SessionService()
+# Remove global service initialization - now handled by dependency injection
 
 # In-memory token store (in production, use Redis or database)
 download_tokens: Dict[str, Dict[str, Any]] = {}
@@ -261,13 +260,13 @@ def cleanup_expired_tokens():
 
 # Dependency Functions
 
-async def get_pdf_service() -> PDFService:
+async def get_pdf_service_dep() -> PDFService:
     """Dependency to get PDF service instance."""
-    return pdf_service
+    return await get_pdf_service()
 
-async def get_session_service() -> SessionService:
+async def get_session_service_dep() -> SessionService:
     """Dependency to get session service instance."""
-    return session_service
+    return await get_session_service()
 
 # Route Handlers
 
@@ -351,8 +350,8 @@ async def get_session_service() -> SessionService:
 async def generate_sanction_letter(
     request: Request,
     generation_request: SanctionGenerationRequest,
-    pdf_service: PDFService = Depends(get_pdf_service),
-    session_service: SessionService = Depends(get_session_service)
+    pdf_service: PDFService = Depends(get_pdf_service_dep),
+    session_service: SessionService = Depends(get_session_service_dep)
 ) -> SanctionGenerationResponse:
     """
     Generate sanction letter PDF with secure download link.

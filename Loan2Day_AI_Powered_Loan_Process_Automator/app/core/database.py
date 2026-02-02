@@ -228,6 +228,9 @@ async def init_database() -> None:
     try:
         await db_manager.initialize()
         
+        # Set up event listeners after engine is created
+        _setup_event_listeners()
+        
         # Create tables in development/testing environments
         if settings.environment in ["development", "test"]:
             await db_manager.create_tables()
@@ -255,21 +258,26 @@ async def close_database() -> None:
         logger.error(f"Error closing database connections: {str(e)}")
         raise
 
-# Database event listeners for logging and monitoring
-@event.listens_for(db_manager.engine, "connect", once=True)
-def receive_connect(dbapi_connection, connection_record):
-    """Log database connection events."""
-    logger.info("Database connection established")
+def _setup_event_listeners() -> None:
+    """Set up database event listeners after engine is initialized."""
+    if db_manager.engine is None:
+        logger.warning("Cannot set up event listeners: engine not initialized")
+        return
+    
+    @event.listens_for(db_manager.engine, "connect", once=True)
+    def receive_connect(dbapi_connection, connection_record):
+        """Log database connection events."""
+        logger.info("Database connection established")
 
-@event.listens_for(db_manager.engine, "checkout")
-def receive_checkout(dbapi_connection, connection_record, connection_proxy):
-    """Log connection checkout from pool."""
-    logger.debug("Database connection checked out from pool")
+    @event.listens_for(db_manager.engine, "checkout")
+    def receive_checkout(dbapi_connection, connection_record, connection_proxy):
+        """Log connection checkout from pool."""
+        logger.debug("Database connection checked out from pool")
 
-@event.listens_for(db_manager.engine, "checkin")
-def receive_checkin(dbapi_connection, connection_record):
-    """Log connection checkin to pool."""
-    logger.debug("Database connection checked in to pool")
+    @event.listens_for(db_manager.engine, "checkin")
+    def receive_checkin(dbapi_connection, connection_record):
+        """Log connection checkin to pool."""
+        logger.debug("Database connection checked in to pool")
 
 # Export database functions and manager
 __all__ = [

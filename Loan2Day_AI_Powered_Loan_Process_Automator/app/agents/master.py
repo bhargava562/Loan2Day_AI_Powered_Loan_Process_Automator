@@ -39,6 +39,10 @@ from app.models.pydantic_models import (
 from app.agents.sales import SalesAgent, ConversationStage
 from app.agents.verification import VerificationAgent
 from app.agents.underwriting import UnderwritingAgent
+from app.core.error_handling import (
+    agent_failure_handler, error_logger, ErrorSeverity, ErrorCategory,
+    create_error_response, ErrorCode
+)
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -358,23 +362,46 @@ class MasterAgent:
         return state
     
     async def _sales_processing_node(self, state: LoanProcessingState) -> LoanProcessingState:
-        """LangGraph node: Process request through Sales Agent."""
+        """LangGraph node: Process request through Sales Agent with error handling."""
         logger.info("Processing sales agent node")
         
         try:
             # Reconstruct AgentState from serialized data
             agent_state = self._deserialize_agent_state(state["agent_state"])
             
-            # Process through Sales Agent
-            sales_result = await self.sales_agent.process_sales_interaction(
+            # Process through Sales Agent with circuit breaker protection
+            sales_result = await agent_failure_handler.execute_agent_task(
+                "sales_agent",
+                self.sales_agent.process_sales_interaction,
+                None,  # No fallback for now
                 agent_state,
                 state["user_input"],
                 interaction_type="general"
             )
             
+            if not sales_result["success"]:
+                # Handle agent failure
+                error_logger.log_error(
+                    Exception(sales_result["error"]),
+                    {
+                        "agent": "sales_agent",
+                        "session_id": state["session_id"],
+                        "execution_path": sales_result["execution_path"]
+                    },
+                    ErrorSeverity.HIGH,
+                    ErrorCategory.SYSTEM
+                )
+                
+                state["error_occurred"] = True
+                state["error_message"] = f"Sales agent processing failed: {sales_result['error']}"
+                return state
+            
+            # Extract actual result
+            actual_result = sales_result["result"]
+            
             # Update agent state with sentiment history
-            if "sentiment_analysis" in sales_result:
-                sentiment_data = sales_result["sentiment_analysis"]
+            if "sentiment_analysis" in actual_result:
+                sentiment_data = actual_result["sentiment_analysis"]
                 sentiment_score = SentimentScore(
                     polarity=sentiment_data["polarity"],
                     subjectivity=sentiment_data["subjectivity"],
@@ -385,13 +412,24 @@ class MasterAgent:
                 agent_state.sentiment_history.append(sentiment_score)
             
             # Store results
-            state["sales_result"] = sales_result
+            state["sales_result"] = actual_result
             state["agent_state"] = self._serialize_agent_state(agent_state)
             state["error_occurred"] = False
             
             logger.info("Sales processing completed successfully")
             
         except Exception as e:
+            error_logger.log_error(
+                e,
+                {
+                    "agent": "sales_agent",
+                    "session_id": state["session_id"],
+                    "user_input": state["user_input"]
+                },
+                ErrorSeverity.HIGH,
+                ErrorCategory.SYSTEM
+            )
+            
             logger.error(f"Sales processing failed: {str(e)}")
             state["error_occurred"] = True
             state["error_message"] = f"Sales processing failed: {str(e)}"
@@ -399,30 +437,63 @@ class MasterAgent:
         return state
     
     async def _verification_processing_node(self, state: LoanProcessingState) -> LoanProcessingState:
-        """LangGraph node: Process request through Verification Agent."""
+        """LangGraph node: Process request through Verification Agent with error handling."""
         logger.info("Processing verification agent node")
         
         try:
             # Reconstruct AgentState from serialized data
             agent_state = self._deserialize_agent_state(state["agent_state"])
             
-            # Process through Verification Agent
-            verification_result = await self.verification_agent.process_verification_request(
+            # Process through Verification Agent with circuit breaker protection
+            verification_result = await agent_failure_handler.execute_agent_task(
+                "verification_agent",
+                self.verification_agent.process_verification_request,
+                None,  # No fallback for now
                 agent_state
             )
             
+            if not verification_result["success"]:
+                # Handle agent failure
+                error_logger.log_error(
+                    Exception(verification_result["error"]),
+                    {
+                        "agent": "verification_agent",
+                        "session_id": state["session_id"],
+                        "execution_path": verification_result["execution_path"]
+                    },
+                    ErrorSeverity.HIGH,
+                    ErrorCategory.SYSTEM
+                )
+                
+                state["error_occurred"] = True
+                state["error_message"] = f"Verification agent processing failed: {verification_result['error']}"
+                return state
+            
+            # Extract actual result
+            actual_result = verification_result["result"]
+            
             # Update agent state with verification results
-            agent_state.kyc_status = KYCStatus(verification_result["overall_status"])
-            agent_state.fraud_score = verification_result["average_fraud_score"]
+            agent_state.kyc_status = KYCStatus(actual_result["overall_status"])
+            agent_state.fraud_score = actual_result["average_fraud_score"]
             
             # Store results
-            state["verification_result"] = verification_result
+            state["verification_result"] = actual_result
             state["agent_state"] = self._serialize_agent_state(agent_state)
             state["error_occurred"] = False
             
             logger.info("Verification processing completed successfully")
             
         except Exception as e:
+            error_logger.log_error(
+                e,
+                {
+                    "agent": "verification_agent",
+                    "session_id": state["session_id"]
+                },
+                ErrorSeverity.HIGH,
+                ErrorCategory.SYSTEM
+            )
+            
             logger.error(f"Verification processing failed: {str(e)}")
             state["error_occurred"] = True
             state["error_message"] = f"Verification processing failed: {str(e)}"
@@ -430,21 +501,44 @@ class MasterAgent:
         return state
     
     async def _underwriting_processing_node(self, state: LoanProcessingState) -> LoanProcessingState:
-        """LangGraph node: Process request through Underwriting Agent."""
+        """LangGraph node: Process request through Underwriting Agent with error handling."""
         logger.info("Processing underwriting agent node")
         
         try:
             # Reconstruct AgentState from serialized data
             agent_state = self._deserialize_agent_state(state["agent_state"])
             
-            # Process through Underwriting Agent
-            underwriting_result = await self.underwriting_agent.process_underwriting_request(
+            # Process through Underwriting Agent with circuit breaker protection
+            underwriting_result = await agent_failure_handler.execute_agent_task(
+                "underwriting_agent",
+                self.underwriting_agent.process_underwriting_request,
+                None,  # No fallback for now
                 agent_state
             )
             
+            if not underwriting_result["success"]:
+                # Handle agent failure
+                error_logger.log_error(
+                    Exception(underwriting_result["error"]),
+                    {
+                        "agent": "underwriting_agent",
+                        "session_id": state["session_id"],
+                        "execution_path": underwriting_result["execution_path"]
+                    },
+                    ErrorSeverity.HIGH,
+                    ErrorCategory.SYSTEM
+                )
+                
+                state["error_occurred"] = True
+                state["error_message"] = f"Underwriting agent processing failed: {underwriting_result['error']}"
+                return state
+            
+            # Extract actual result
+            actual_result = underwriting_result["result"]
+            
             # Update agent state with underwriting results
-            if "emi_calculation" in underwriting_result:
-                emi_data = underwriting_result["emi_calculation"]
+            if "emi_calculation" in actual_result:
+                emi_data = actual_result["emi_calculation"]
                 agent_state.emi_calculation = EMICalculation(
                     principal_in_cents=Decimal(emi_data["principal_in_cents"]),
                     rate_per_annum=Decimal(emi_data["rate_per_annum"]),
@@ -455,25 +549,35 @@ class MasterAgent:
                 )
             
             # Update loan details with underwriting results
-            if "approved_amount_in_cents" in underwriting_result:
+            if "approved_amount_in_cents" in actual_result:
                 agent_state.loan_details["approved_amount_in_cents"] = Decimal(
-                    underwriting_result["approved_amount_in_cents"]
+                    actual_result["approved_amount_in_cents"]
                 )
                 agent_state.loan_details["approved_rate"] = Decimal(
-                    underwriting_result["approved_rate"]
+                    actual_result["approved_rate"]
                 )
                 agent_state.loan_details["approved_emi_in_cents"] = Decimal(
-                    underwriting_result["approved_emi_in_cents"]
+                    actual_result["approved_emi_in_cents"]
                 )
             
             # Store results
-            state["underwriting_result"] = underwriting_result
+            state["underwriting_result"] = actual_result
             state["agent_state"] = self._serialize_agent_state(agent_state)
             state["error_occurred"] = False
             
             logger.info("Underwriting processing completed successfully")
             
         except Exception as e:
+            error_logger.log_error(
+                e,
+                {
+                    "agent": "underwriting_agent",
+                    "session_id": state["session_id"]
+                },
+                ErrorSeverity.HIGH,
+                ErrorCategory.SYSTEM
+            )
+            
             logger.error(f"Underwriting processing failed: {str(e)}")
             state["error_occurred"] = True
             state["error_message"] = f"Underwriting processing failed: {str(e)}"

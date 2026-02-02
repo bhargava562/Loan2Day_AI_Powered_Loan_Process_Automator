@@ -32,6 +32,7 @@ from app.models.pydantic_models import (
 )
 from app.agents.sales import SalesAgent
 from app.services.session_service import SessionService
+from app.core.dependencies import get_sales_agent, get_session_service
 from app.core.config import settings
 
 # Configure logger
@@ -40,9 +41,7 @@ logger = logging.getLogger(__name__)
 # Create router
 router = APIRouter()
 
-# Initialize services
-sales_agent = SalesAgent()
-session_service = SessionService()
+# Remove global service initialization - now handled by dependency injection
 
 class PlanBError(Exception):
     """Base exception for Plan B API errors."""
@@ -185,13 +184,13 @@ class PlanBResponse(BaseModel):
 
 # Dependency Functions
 
-async def get_sales_agent() -> SalesAgent:
+async def get_sales_agent_dep() -> SalesAgent:
     """Dependency to get sales agent instance."""
-    return sales_agent
+    return await get_sales_agent()
 
-async def get_session_service() -> SessionService:
+async def get_session_service_dep() -> SessionService:
     """Dependency to get session service instance."""
-    return session_service
+    return await get_session_service()
 
 async def validate_session_and_rejection(
     session_id: str, 
@@ -339,8 +338,8 @@ async def get_plan_b_offers(
     user_id: str = Query(..., description="User identifier"),
     rejection_reason: Optional[str] = Query(None, description="Specific rejection reason"),
     max_offers: int = Query(3, ge=1, le=5, description="Maximum offers to return"),
-    sales_agent: SalesAgent = Depends(get_sales_agent),
-    session_service: SessionService = Depends(get_session_service)
+    sales_agent: SalesAgent = Depends(get_sales_agent_dep),
+    session_service: SessionService = Depends(get_session_service_dep)
 ) -> PlanBResponse:
     """
     Get alternative loan offers for rejection recovery.
@@ -545,7 +544,7 @@ async def select_plan_b_offer(
     session_id: str,
     user_id: str,
     offer_id: str,
-    session_service: SessionService = Depends(get_session_service)
+    session_service: SessionService = Depends(get_session_service_dep)
 ) -> Dict[str, Any]:
     """
     Select a specific Plan B alternative offer.

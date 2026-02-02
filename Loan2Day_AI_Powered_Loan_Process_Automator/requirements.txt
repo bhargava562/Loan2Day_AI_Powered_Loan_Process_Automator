@@ -3,6 +3,7 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
 pydantic-settings==2.1.0
+starlette==0.27.0
 
 # Agent Orchestration
 langgraph==0.0.62
@@ -14,6 +15,10 @@ asyncpg==0.29.0
 sqlalchemy[asyncio]==2.0.23
 alembic==1.13.1
 redis[hiredis]==5.0.1
+
+# Message Streaming
+aiokafka==0.10.0
+kafka-python==2.0.2
 
 # AI/ML Libraries
 numpy==1.24.4

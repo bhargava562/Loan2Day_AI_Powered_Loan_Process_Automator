@@ -37,6 +37,7 @@ from app.models.pydantic_models import (
 )
 from app.agents.verification import VerificationAgent
 from app.services.session_service import SessionService
+from app.core.dependencies import get_verification_agent, get_session_service
 from app.core.config import settings
 
 # Configure logger
@@ -45,9 +46,7 @@ logger = logging.getLogger(__name__)
 # Create router
 router = APIRouter()
 
-# Initialize services
-verification_agent = VerificationAgent()
-session_service = SessionService()
+# Remove global service initialization - now handled by dependency injection
 
 class UploadError(Exception):
     """Base exception for upload API errors."""
@@ -216,6 +215,7 @@ async def validate_session_exists(session_id: str, user_id: str) -> None:
     Raises:
         HTTPException: If session not found or unauthorized
     """
+    session_service = await get_session_service()
     agent_state = await session_service.get_session(session_id, user_id)
     if not agent_state:
         raise HTTPException(
@@ -225,13 +225,13 @@ async def validate_session_exists(session_id: str, user_id: str) -> None:
 
 # Dependency Functions
 
-async def get_verification_agent() -> VerificationAgent:
+async def get_verification_agent_dep() -> VerificationAgent:
     """Dependency to get verification agent instance."""
-    return verification_agent
+    return await get_verification_agent()
 
-async def get_session_service() -> SessionService:
+async def get_session_service_dep() -> SessionService:
     """Dependency to get session service instance."""
-    return session_service
+    return await get_session_service()
 
 # Route Handlers
 
@@ -344,8 +344,8 @@ async def upload_kyc_document(
     user_id: str = Form(..., description="User identifier"),
     document_type: DocumentType = Form(..., description="Type of KYC document"),
     file: UploadFile = File(..., description="KYC document file"),
-    verification_agent: VerificationAgent = Depends(get_verification_agent),
-    session_service: SessionService = Depends(get_session_service)
+    verification_agent: VerificationAgent = Depends(get_verification_agent_dep),
+    session_service: SessionService = Depends(get_session_service_dep)
 ) -> KYCUploadResponse:
     """
     Upload and process KYC document with SGS security scanning.
@@ -615,7 +615,7 @@ async def upload_kyc_document(
 async def get_upload_status(
     upload_id: str,
     user_id: str,
-    session_service: SessionService = Depends(get_session_service)
+    session_service: SessionService = Depends(get_session_service_dep)
 ) -> Dict[str, Any]:
     """
     Get upload processing status.

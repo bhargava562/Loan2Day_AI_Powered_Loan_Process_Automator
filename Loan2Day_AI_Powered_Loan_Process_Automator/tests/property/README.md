@@ -1,258 +1,237 @@
-# Property-Based Testing for Loan2Day PDF Generation
+# Property-Based Testing Suite for Loan2Day
 
-## Overview
+This directory contains comprehensive property-based tests using Hypothesis to verify universal properties of the Loan2Day fintech platform across all possible input scenarios.
 
-This directory contains property-based tests for the Loan2Day PDF generation system using Hypothesis. Property-based testing ensures that our PDF generation system maintains consistent behavior across all possible input variations, providing comprehensive coverage beyond traditional unit tests.
+## 🧪 Test Philosophy
 
-## Test Architecture
+Property-based testing validates **universal properties** that must hold true for ALL possible inputs, not just specific test cases. This approach:
 
-### Framework: Hypothesis
-- **Iterations**: Minimum 100 iterations per property test (configurable)
-- **Strategy**: Randomized input generation with domain-specific constraints
-- **Coverage**: Universal properties verified across all loan scenarios
+- **Discovers edge cases** automatically through randomized input generation
+- **Validates business logic** across the entire input space
+- **Ensures mathematical accuracy** with the LQM Standard (Decimal precision)
+- **Verifies security constraints** against malicious inputs
+- **Tests Plan B scenarios** for rejection recovery workflows
 
-### LQM Standard Compliance
-All tests strictly enforce the **LQM (Logic Quantization Module) Standard**:
-- ✅ **Zero-Hallucination Math**: All monetary values use `decimal.Decimal`
-- ✅ **Float Rejection**: Tests verify that `float` inputs are properly rejected
-- ✅ **Precision Validation**: Ensures exactly 2 decimal places for currency
+## 📁 Test Structure
 
-## Test Coverage
+### Core Test Files
 
-### Property 17: PDF Generation Completeness
+- **`test_pdf_properties.py`** - PDF Generation Service property tests
+- **`test_lqm_properties.py`** - Loan Quotation Math (LQM) property tests  
+- **`test_sgs_properties.py`** - Secure Gateway Service (SGS) property tests
+- **`test_error_handling_properties.py`** - Error handling and recovery property tests
 
-#### Core Properties Tested
+## 🎯 PDF Generation Properties (test_pdf_properties.py)
 
-1. **Data Field Completeness** (`test_pdf_data_field_completeness_property`)
-   - Verifies all mandatory fields are present in generated PDFs
-   - Validates proper currency formatting (₹ symbol, decimal precision)
-   - Ensures loan ID is included in filename
-   - **Iterations**: 100
+### TestPDFGenerationCompleteness
+**Feature:** loan2day, Property 17: PDF Generation Completeness
 
-2. **Generation Consistency** (`test_pdf_generation_consistency_property`)
-   - Ensures identical inputs produce identical PDF outputs
-   - Validates deterministic behavior across multiple runs
-   - Checks file size consistency
-   - **Iterations**: 100
+- **`test_pdf_data_field_completeness_property`** - Verifies ALL PDFs contain required data fields
+- **`test_pdf_generation_consistency_property`** - Ensures deterministic PDF generation
+- **`test_pdf_security_properties`** - Validates security requirements (no executable content)
+- **`test_pdf_mathematical_accuracy_property`** - Verifies LQM Standard mathematical precision
+- **`test_pdf_tanglish_support_property`** - Tests mixed-language (Tamil+English) support
+- **`test_pdf_plan_b_scenario_property`** - Validates Plan B rejection recovery workflows
+- **`test_pdf_concurrent_generation_property`** - Tests thread-safe concurrent operations
 
-3. **Security Properties** (`test_pdf_security_properties`)
-   - Validates safe filename generation (no path traversal)
-   - Ensures proper PDF file headers
-   - Checks reasonable file size bounds (1KB - 10MB)
-   - **Iterations**: 50
+### TestPDFSecurityProperties
+**Feature:** loan2day, Property 17: PDF Generation Security
 
-4. **Error Handling** (`test_pdf_error_handling_property`)
-   - Verifies proper rejection of `float` inputs (LQM Standard)
-   - Tests graceful handling of invalid data
-   - Validates appropriate exception types
-   - **Iterations**: 50
+- **`test_pdf_input_sanitization_property`** - Validates input sanitization against malicious content
+- **`test_pdf_float_rejection_property`** - Enforces LQM Standard (rejects float inputs)
+- **`test_pdf_negative_amount_rejection_property`** - Validates business logic constraints
+- **`test_pdf_invalid_tenure_rejection_property`** - Tests tenure validation (1-360 months)
+- **`test_pdf_empty_name_rejection_property`** - Validates required field enforcement
 
-5. **Mathematical Accuracy** (`test_pdf_mathematical_accuracy_property`)
-   - Validates EMI calculation accuracy using LQM
-   - Ensures total_amount = principal + interest
-   - Checks EMI × tenure ≈ total_amount (with rounding tolerance)
-   - **Iterations**: 50
+### TestPDFPerformanceProperties
+**Feature:** loan2day, Property 17: PDF Generation Performance
 
-6. **Tanglish Support** (`test_pdf_tanglish_support_property`)
-   - Tests mixed-language input handling (Tamil + English)
-   - Ensures proper encoding for Indian fintech use cases
-   - Validates PDF generation with Unicode characters
-   - **Iterations**: 30
+- **`test_pdf_generation_speed_property`** - Ensures real-time generation (< 5 seconds)
+- **`test_pdf_file_size_optimization_property`** - Validates optimal file sizes (50KB-500KB)
+- **`test_pdf_memory_usage_property`** - Tests memory efficiency in batch operations
 
-7. **Plan B Scenarios** (`test_pdf_plan_b_scenario_property`)
-   - Tests PDF generation for alternative loan offers
-   - Validates processing fees and insurance premiums
-   - Ensures Plan B logic integration
-   - **Iterations**: Single test
+### TestPDFRegulatoryComplianceProperties
+**Feature:** loan2day, Property 17: PDF Regulatory Compliance
 
-#### Advanced Properties
+- **`test_pdf_mandatory_disclosures_property`** - Verifies RBI compliance requirements
+- **`test_pdf_high_interest_rate_warnings_property`** - Tests warnings for rates > 25%
+- **`test_pdf_large_loan_compliance_property`** - Validates additional requirements for loans > ₹50L
 
-8. **Plan B Rejection Recovery** (`test_pdf_plan_b_rejection_recovery_property`)
-   - Tests PDF generation after initial loan rejection
-   - Validates reduced amounts and modified terms
-   - Ensures proper Plan B identifier in filename
-   - **Iterations**: 30
+### TestPDFAgentStateIntegrationProperties
+**Feature:** loan2day, Property 17: PDF Agent Integration
 
-9. **Edge Case Scenarios** (`test_pdf_edge_case_scenarios_property`)
-   - Tests very small loan amounts
-   - Validates maximum tenure (30 years)
-   - Handles very low interest rates (near 0%)
-   - **Iterations**: 20
+- **`test_pdf_agent_state_data_extraction_property`** - Tests Master-Worker agent pattern compliance
+- **`test_pdf_agent_state_validation_property`** - Validates AgentState data completeness
+- **`test_pdf_plan_b_agent_state_property`** - Tests Plan B scenarios from AgentState
 
-10. **Concurrent Generation** (`test_pdf_concurrent_generation_property`)
-    - Tests thread-safety for concurrent PDF generation
-    - Validates unique filename generation
-    - Ensures no data corruption in multi-threaded scenarios
-    - **Success Rate**: ≥80% required
+### TestPDFEdgeCaseProperties
+**Feature:** loan2day, Property 17: PDF Edge Case Handling
 
-## Input Strategies
+- **`test_pdf_unicode_handling_property`** - Tests Unicode/Tamil character support
+- **`test_pdf_micro_loan_property`** - Validates micro-finance scenarios
+- **`test_pdf_file_system_edge_cases_property`** - Tests filesystem limitations
+- **`test_pdf_concurrent_file_access_property`** - Validates concurrent directory access
 
-### Hypothesis Strategies Used
+## 🔧 Running Property Tests
 
+### Individual Test Classes
+```bash
+# Run PDF generation completeness tests
+python -m pytest tests/property/test_pdf_properties.py::TestPDFGenerationCompleteness -v
+
+# Run security property tests
+python -m pytest tests/property/test_pdf_properties.py::TestPDFSecurityProperties -v
+
+# Run performance property tests  
+python -m pytest tests/property/test_pdf_properties.py::TestPDFPerformanceProperties -v
+```
+
+### Specific Properties
+```bash
+# Test PDF data field completeness (100 iterations)
+python -m pytest tests/property/test_pdf_properties.py::TestPDFGenerationCompleteness::test_pdf_data_field_completeness_property -v
+
+# Test LQM Standard enforcement
+python -m pytest tests/property/test_pdf_properties.py::TestPDFSecurityProperties::test_pdf_float_rejection_property -v
+
+# Test Plan B scenarios
+python -m pytest tests/property/test_pdf_properties.py::TestPDFGenerationCompleteness::test_pdf_plan_b_scenario_property -v
+```
+
+### Full Property Test Suite
+```bash
+# Run all property tests (WARNING: Takes 10-30 minutes)
+python -m pytest tests/property/ -v --tb=short
+
+# Run with statistics
+python -m pytest tests/property/ -v --hypothesis-show-statistics
+```
+
+## 📊 Test Coverage Metrics
+
+### Input Space Coverage
+- **Monetary Values:** ₹1,000 to ₹50 Lakh (using Decimal precision)
+- **Interest Rates:** 0% to 50% per annum
+- **Loan Tenure:** 6 to 360 months (0.5 to 30 years)
+- **Names:** Unicode support including Tamil/Hindi characters
+- **Edge Cases:** Micro-loans, large loans, concurrent operations
+
+### Property Validation
+- **Mathematical Accuracy:** 100% LQM Standard compliance
+- **Security:** Input sanitization, float rejection, path traversal protection
+- **Performance:** Real-time generation, memory efficiency, file size optimization
+- **Regulatory:** RBI compliance, mandatory disclosures, audit trails
+- **Integration:** Master-Worker agent pattern, AgentState validation
+
+## 🚨 Critical Properties
+
+### LQM Standard Enforcement
 ```python
-# Valid names with international characters
-name_strategy = st.text(
-    alphabet=st.characters(whitelist_categories=('Lu', 'Ll', 'Pd', 'Zs')),
-    min_size=2, max_size=50
-).filter(lambda x: x.strip() and not x.isspace())
+# NEVER use float for currency - must use Decimal
+with pytest.raises((FloatInputError, DataValidationError)):
+    SanctionLetterData(
+        loan_amount_in_cents=1000.50,  # Float - REJECTED
+        # ... other params
+    )
+```
 
-# Loan amounts: ₹1,000 to ₹50 Lakh (in cents)
+### Plan B Rejection Recovery
+```python
+# Plan B scenarios must generate valid PDFs
+plan_b_data = SanctionLetterData(
+    loan_amount_in_cents=reduced_amount,  # 70% of original
+    interest_rate=higher_rate,            # +3% rate increase
+    # ... Plan B terms
+)
+pdf_path = pdf_service.generate_sanction_letter(plan_b_data)
+assert os.path.exists(pdf_path)  # Must succeed
+```
+
+### Security Validation
+```python
+# Malicious inputs must be sanitized or rejected
+potentially_malicious_name = "../../../etc/passwd"
+# PDF service must handle safely without path traversal
+```
+
+## 🎯 Property Test Benefits
+
+1. **Comprehensive Coverage** - Tests ALL possible input combinations, not just happy paths
+2. **Edge Case Discovery** - Automatically finds boundary conditions and corner cases  
+3. **Mathematical Verification** - Ensures LQM Standard precision across all calculations
+4. **Security Validation** - Tests against malicious inputs and injection attacks
+5. **Performance Assurance** - Validates real-time constraints under all conditions
+6. **Regulatory Compliance** - Ensures RBI requirements are met for all loan scenarios
+
+## 📈 Hypothesis Configuration
+
+### Test Settings
+- **Max Examples:** 10-100 iterations per property (configurable)
+- **Deadline:** Disabled for PDF generation tests (I/O intensive)
+- **Database:** Persistent example storage for regression testing
+- **Shrinking:** Automatic minimal failing case discovery
+
+### Strategy Configuration
+```python
+# Monetary amounts (in cents for precision)
 loan_amount_strategy = st.decimals(
     min_value=Decimal('100000'),     # ₹1,000
     max_value=Decimal('5000000000'), # ₹50 Lakh
     places=2
 )
 
-# EMI amounts: ₹500 to ₹2 Lakh (in cents)
-emi_strategy = st.decimals(
-    min_value=Decimal('50000'),      # ₹500
-    max_value=Decimal('20000000'),   # ₹2 Lakh
-    places=2
-)
-
-# Interest rates: 0% to 50% per annum
+# Interest rates (percentage per annum)
 interest_rate_strategy = st.decimals(
     min_value=Decimal('0.00'),
     max_value=Decimal('50.00'),
     places=2
 )
-
-# Tenure: 6 months to 30 years
-tenure_strategy = st.integers(min_value=6, max_value=360)
 ```
 
-## Running the Tests
+## 🔍 Debugging Property Failures
 
-### Individual Test
-```bash
-python -m pytest tests/property/test_pdf_properties.py::TestPDFGenerationCompleteness::test_pdf_data_field_completeness_property -v
+### Hypothesis Shrinking
+When a property test fails, Hypothesis automatically finds the **minimal failing example**:
+
+```
+Falsifying example: test_pdf_data_field_completeness_property(
+    borrower_name='AA',
+    loan_amount=Decimal('100000.00'),
+    emi_amount=Decimal('50000.00'),
+    interest_rate=Decimal('0.01'),
+    tenure=6
+)
 ```
 
-### Full Property Test Suite
-```bash
-python -m pytest tests/property/test_pdf_properties.py -v
+### Root Cause Analysis
+1. **Check LQM Standard** - Are all monetary values using Decimal?
+2. **Validate Business Logic** - Do the inputs make mathematical sense?
+3. **Review Agent State** - Is the Master-Worker pattern being followed?
+4. **Examine Security** - Are inputs properly sanitized?
+
+## 🚀 Continuous Integration
+
+Property tests are integrated into the CI/CD pipeline:
+
+```yaml
+# .github/workflows/property-tests.yml
+- name: Run Property Tests
+  run: |
+    python -m pytest tests/property/ \
+      --hypothesis-show-statistics \
+      --tb=short \
+      --maxfail=5
 ```
 
-### With Coverage Report
-```bash
-python -m pytest tests/property/test_pdf_properties.py --cov=app.services.pdf_service --cov-report=html
-```
+## 📚 References
 
-## Test Results Summary
-
-✅ **All 10 property tests passing**
-- Total test execution time: ~6 seconds
-- Total property iterations: 500+ per full run
-- Coverage: PDF generation, validation, error handling, edge cases
-
-## Architecture Integration
-
-### Master-Worker Agent Pattern
-- Tests validate PDF generation within the agent orchestration workflow
-- Ensures proper data flow from AgentState to PDF generation
-- Validates Plan B logic integration
-
-### Service Layer Testing
-- Tests follow the `Routes -> Services -> Repositories` pattern
-- PDF service is tested in isolation with mocked dependencies
-- Validates proper separation of concerns
-
-### Security Integration
-- All tests validate SGS (Spectral-Graph Sentinel) integration points
-- File security checks are property-tested
-- Path traversal protection is verified
-
-## Compliance & Standards
-
-### Financial Regulations
-- All monetary calculations tested for precision
-- Regulatory disclosure inclusion verified
-- Legal document generation standards enforced
-
-### LQM Standard Enforcement
-- **Zero tolerance** for `float` usage in monetary calculations
-- Strict `decimal.Decimal` type validation
-- Precision enforcement (exactly 2 decimal places)
-
-### Error Handling Standards
-- **Fail Fast** principle: Invalid inputs rejected immediately
-- Proper exception hierarchy maintained
-- Clear error messages for debugging
-
-## Maintenance
-
-### Adding New Properties
-1. Create new test method with `@given` decorator
-2. Use appropriate Hypothesis strategies
-3. Follow naming convention: `test_pdf_[property_name]_property`
-4. Add comprehensive docstring with feature reference
-5. Set appropriate `max_examples` based on complexity
-
-### Updating Strategies
-- Modify strategies in the module header
-- Ensure backward compatibility
-- Update documentation
-
-### Performance Tuning
-- Adjust `max_examples` based on CI/CD time constraints
-- Use `@settings(deadline=None)` for complex properties
-- Consider `@example()` decorator for specific edge cases
-
-## Integration with CI/CD
-
-### Pre-commit Hooks
-```bash
-# Run property tests before commit
-python -m pytest tests/property/ --tb=short
-```
-
-### CI Pipeline
-- Property tests run on every pull request
-- Failure blocks merge to main branch
-- Performance regression detection
-
-### Monitoring
-- Test execution time tracking
-- Property coverage metrics
-- Failure pattern analysis
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Hypothesis Health Check Failures**
-   - Increase `max_examples` or adjust strategies
-   - Use `suppress_health_check` sparingly
-
-2. **Timeout Issues**
-   - Set `deadline=None` for complex properties
-   - Optimize test logic for performance
-
-3. **Flaky Tests**
-   - Use `@reproduce_failure` decorator for debugging
-   - Check for non-deterministic behavior
-
-### Debug Mode
-```bash
-# Run with verbose Hypothesis output
-python -m pytest tests/property/ -v -s --hypothesis-show-statistics
-```
-
-## Future Enhancements
-
-### Planned Properties
-- Multi-language PDF generation (Hindi, Tamil, etc.)
-- Batch PDF generation performance
-- Memory usage validation
-- PDF accessibility compliance (WCAG)
-
-### Integration Tests
-- End-to-end agent workflow testing
-- Database integration property tests
-- API endpoint property validation
+- **Hypothesis Documentation:** https://hypothesis.readthedocs.io/
+- **Property-Based Testing:** https://increment.com/testing/in-praise-of-property-based-testing/
+- **LQM Standard:** `app/core/lqm.py` - Loan Quotation Math precision requirements
+- **Master-Worker Pattern:** `app/agents/` - Agent orchestration architecture
 
 ---
 
-**Author**: Lead AI Architect, Loan2Day Fintech Platform  
-**Last Updated**: February 2026  
-**Test Framework**: Hypothesis 6.151.4, pytest 9.0.2
+**Author:** Lead AI Architect, Loan2Day Fintech Platform  
+**Last Updated:** February 2026  
+**Test Framework:** Hypothesis 6.92.1, pytest 7.4.3

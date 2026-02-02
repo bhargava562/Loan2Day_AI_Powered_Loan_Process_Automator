@@ -35,6 +35,7 @@ from app.models.pydantic_models import (
 )
 from app.agents.master import MasterAgent
 from app.services.session_service import SessionService
+from app.core.dependencies import get_master_agent, get_session_service
 from app.core.config import settings
 
 # Configure logger
@@ -43,9 +44,7 @@ logger = logging.getLogger(__name__)
 # Create router
 router = APIRouter()
 
-# Initialize services (will be dependency injected in production)
-master_agent = MasterAgent()
-session_service = SessionService()
+# Remove global service initialization - now handled by dependency injection
 
 class ChatError(Exception):
     """Base exception for chat API errors."""
@@ -171,13 +170,13 @@ class ChatResponse(BaseModel):
 
 # Dependency Functions
 
-async def get_session_service() -> SessionService:
+async def get_session_service_dep() -> SessionService:
     """Dependency to get session service instance."""
-    return session_service
+    return await get_session_service()
 
-async def get_master_agent() -> MasterAgent:
+async def get_master_agent_dep() -> MasterAgent:
     """Dependency to get master agent instance."""
-    return master_agent
+    return await get_master_agent()
 
 async def validate_request_size(request: Request):
     """Validate request size to prevent abuse."""
@@ -272,8 +271,8 @@ async def validate_request_size(request: Request):
 async def process_chat_message(
     chat_request: ChatRequest,
     request: Request,
-    session_service: SessionService = Depends(get_session_service),
-    master_agent: MasterAgent = Depends(get_master_agent),
+    session_service: SessionService = Depends(get_session_service_dep),
+    master_agent: MasterAgent = Depends(get_master_agent_dep),
     _: None = Depends(validate_request_size)
 ) -> ChatResponse:
     """
@@ -439,7 +438,7 @@ async def process_chat_message(
 async def get_session_info(
     session_id: str,
     user_id: str,
-    session_service: SessionService = Depends(get_session_service)
+    session_service: SessionService = Depends(get_session_service_dep)
 ) -> Dict[str, Any]:
     """
     Get session information and current state.
@@ -503,7 +502,7 @@ async def get_session_info(
 async def delete_session(
     session_id: str,
     user_id: str,
-    session_service: SessionService = Depends(get_session_service)
+    session_service: SessionService = Depends(get_session_service_dep)
 ) -> Dict[str, str]:
     """
     Delete session and clear all data.

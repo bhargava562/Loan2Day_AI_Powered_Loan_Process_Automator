@@ -1,0 +1,53 @@
+# Loan2Day Backend Development Dockerfile
+# Optimized for development with hot reloading
+
+FROM python:3.11-slim
+
+# Set build arguments
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r loan2day && useradd -r -g loan2day loan2day
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Install development dependencies
+RUN pip install --no-cache-dir \
+    pytest \
+    pytest-asyncio \
+    pytest-cov \
+    black \
+    flake8 \
+    mypy
+
+# Create necessary directories
+RUN mkdir -p /app/generated_pdfs /app/uploads /app/logs && \
+    chown -R loan2day:loan2day /app
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Switch to non-root user
+USER loan2day
+
+# Expose port
+EXPOSE 8000
+
+# Development command with hot reloading
+CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

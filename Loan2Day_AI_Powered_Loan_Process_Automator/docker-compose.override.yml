@@ -1,0 +1,65 @@
+# Docker Compose Override for Development
+# This file extends docker-compose.yml with development-specific settings
+
+version: '3.8'
+
+services:
+  # Development overrides for the API
+  loan2day-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      # Mount source code for hot reloading
+      - ./app:/app/app:ro
+      - ./requirements.txt:/app/requirements.txt:ro
+      - ./generated_pdfs:/app/generated_pdfs
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    environment:
+      DEBUG: "true"
+      ENVIRONMENT: "development"
+    command: ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    
+  # Development overrides for the frontend
+  loan2day-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      # Mount source code for hot reloading
+      - ./frontend/src:/app/src:ro
+      - ./frontend/public:/app/public:ro
+      - ./frontend/package.json:/app/package.json:ro
+      - ./frontend/vite.config.ts:/app/vite.config.ts:ro
+    environment:
+      NODE_ENV: "development"
+      VITE_API_BASE_URL: "http://localhost:8000"
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+    
+  # PostgreSQL with development settings
+  postgres:
+    environment:
+      POSTGRES_DB: loan2day_dev
+      POSTGRES_USER: loan2day_dev
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+    
+  # Redis with development settings
+  redis:
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    
+  # Kafka with development settings
+  kafka:
+    ports:
+      - "9093:9092"  # Different port to avoid conflicts
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9093
+      
+  # Remove nginx in development (direct access to services)
+  nginx:
+    profiles:
+      - disabled

@@ -67,8 +67,8 @@ class TestHealthEndpoint:
         # Validate all required services are present
         required_services = [
             "database",
-            "redis", 
-            "kafka",
+            "redis_cache", 
+            "mock_bank",
             "sgs_module",
             "lqm_module"
         ]

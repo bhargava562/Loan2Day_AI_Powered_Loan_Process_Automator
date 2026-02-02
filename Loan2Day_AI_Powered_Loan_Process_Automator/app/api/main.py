@@ -21,6 +21,19 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
+from app.core.middleware import (
+    ErrorHandlingMiddleware,
+    PerformanceMiddleware,
+    RequestTrackingMiddleware,
+    HealthCheckMiddleware
+)
+from app.core.security_middleware import create_security_middleware_stack
+from app.core.error_handling import (
+    ErrorResponse, ErrorCode, create_error_response,
+    get_system_health, external_service_circuit_breakers
+)
+from app.core.security import audit_security_practices, security_event_logger
+from app.core.dependencies import dependency_container, lifespan_manager
 
 
 # Configure structured logging (LQM Standard: NO print statements)
@@ -65,31 +78,13 @@ class ErrorResponse(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Application lifespan manager for startup/shutdown tasks.
+    DEPRECATED: Application lifespan manager.
     
-    Handles:
-    - Database connection initialization
-    - Redis connection setup
-    - Kafka producer initialization
-    - Graceful shutdown procedures
+    This function is replaced by the DependencyContainer lifespan_manager.
+    Kept for reference but not used.
     """
-    logger.info("🚀 Loan2Day platform starting up...")
-    
-    # TODO: Initialize database connections
-    # TODO: Initialize Redis connection
-    # TODO: Initialize Kafka producer
-    
-    logger.info("✅ Loan2Day platform ready to serve requests")
-    
+    # This is now handled by dependency_container.lifespan_manager
     yield
-    
-    logger.info("🛑 Loan2Day platform shutting down...")
-    
-    # TODO: Close database connections
-    # TODO: Close Redis connection
-    # TODO: Close Kafka producer
-    
-    logger.info("✅ Loan2Day platform shutdown complete")
 
 
 # Initialize FastAPI application with proper configuration
@@ -99,7 +94,22 @@ app = FastAPI(
     version=settings.version,
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
-    lifespan=lifespan
+    lifespan=lifespan_manager
+)
+
+# Add comprehensive middleware stack
+app.add_middleware(RequestTrackingMiddleware)
+app.add_middleware(PerformanceMiddleware)
+app.add_middleware(ErrorHandlingMiddleware)
+app.add_middleware(HealthCheckMiddleware)
+
+# Add security middleware stack (includes validation, rate limiting, audit)
+create_security_middleware_stack(
+    app,
+    enable_rate_limiting=True,
+    requests_per_minute=60,
+    enable_validation=True,
+    enable_audit=True
 )
 
 # Add CORS middleware for frontend integration
@@ -125,12 +135,12 @@ async def logging_middleware(request: Request, call_next):
     
     Logs all API requests with timing information for monitoring.
     Follows LQM Standard: structured logging only.
-    """
-    start_time = datetime.now()
     
-    # Generate trace ID for request tracking
-    trace_id = f"req_{int(start_time.timestamp() * 1000000)}"
-    request.state.trace_id = trace_id
+    Note: This middleware works in conjunction with the comprehensive
+    middleware stack for complete request processing.
+    """
+    # The trace ID is now set by RequestTrackingMiddleware
+    trace_id = getattr(request.state, "trace_id", "unknown")
     
     logger.info(
         f"🔄 Request started: {request.method} {request.url.path}",
@@ -144,84 +154,17 @@ async def logging_middleware(request: Request, call_next):
     
     response = await call_next(request)
     
-    end_time = datetime.now()
-    duration_ms = (end_time - start_time).total_seconds() * 1000
-    
+    # Performance tracking is now handled by PerformanceMiddleware
+    # This middleware just logs the completion
     logger.info(
-        f"✅ Request completed: {response.status_code} in {duration_ms:.2f}ms",
+        f"✅ Request completed: {response.status_code}",
         extra={
             "trace_id": trace_id,
-            "status_code": response.status_code,
-            "duration_ms": duration_ms
+            "status_code": response.status_code
         }
     )
     
     return response
-
-
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    """
-    Global HTTP exception handler.
-    
-    Ensures consistent error response format across all endpoints.
-    """
-    trace_id = getattr(request.state, "trace_id", "unknown")
-    
-    error_response = ErrorResponse(
-        error_code=f"HTTP_{exc.status_code}",
-        error_message=exc.detail,
-        error_details={"status_code": exc.status_code},
-        timestamp=datetime.now(),
-        trace_id=trace_id
-    )
-    
-    logger.error(
-        f"❌ HTTP Exception: {exc.status_code} - {exc.detail}",
-        extra={
-            "trace_id": trace_id,
-            "status_code": exc.status_code,
-            "detail": exc.detail
-        }
-    )
-    
-    return JSONResponse(
-        status_code=exc.status_code,
-        content=error_response.dict()
-    )
-
-
-@app.exception_handler(Exception)
-async def general_exception_handler(request: Request, exc: Exception):
-    """
-    Global exception handler for unhandled errors.
-    
-    Provides graceful degradation and proper error logging.
-    """
-    trace_id = getattr(request.state, "trace_id", "unknown")
-    
-    error_response = ErrorResponse(
-        error_code="INTERNAL_SERVER_ERROR",
-        error_message="An unexpected error occurred",
-        error_details={"exception_type": type(exc).__name__},
-        timestamp=datetime.now(),
-        trace_id=trace_id
-    )
-    
-    logger.error(
-        f"💥 Unhandled Exception: {type(exc).__name__} - {str(exc)}",
-        extra={
-            "trace_id": trace_id,
-            "exception_type": type(exc).__name__,
-            "exception_message": str(exc)
-        },
-        exc_info=True
-    )
-    
-    return JSONResponse(
-        status_code=500,
-        content=error_response.dict()
-    )
 
 
 @app.get("/health", response_model=HealthCheckResponse)
@@ -240,14 +183,28 @@ async def health_check() -> HealthCheckResponse:
     """
     logger.info("🏥 Health check requested")
     
-    # TODO: Add actual service health checks
-    services_status = {
-        "database": "healthy",  # TODO: Implement actual DB health check
-        "redis": "healthy",     # TODO: Implement actual Redis health check
-        "kafka": "healthy",     # TODO: Implement actual Kafka health check
-        "sgs_module": "healthy", # TODO: Implement SGS health check
-        "lqm_module": "healthy"  # TODO: Implement LQM health check
+    # Get circuit breaker states for service health
+    circuit_breaker_states = {
+        name: cb.get_state()
+        for name, cb in external_service_circuit_breakers.items()
     }
+    
+    # Determine service health based on circuit breaker states
+    services_status = {}
+    for service_name, cb_state in circuit_breaker_states.items():
+        if cb_state["state"] == "CLOSED":
+            services_status[service_name] = "healthy"
+        elif cb_state["state"] == "HALF_OPEN":
+            services_status[service_name] = "recovering"
+        else:  # OPEN
+            services_status[service_name] = "unhealthy"
+    
+    # Add LQM and SGS module health (always healthy for now)
+    services_status.update({
+        "lqm_module": "healthy",
+        "sgs_module": "healthy",
+        "dependency_container": "healthy" if dependency_container._initialized else "unhealthy"
+    })
     
     return HealthCheckResponse(
         status="healthy",
@@ -256,6 +213,78 @@ async def health_check() -> HealthCheckResponse:
         environment="development" if settings.debug else "production",
         services=services_status
     )
+
+
+@app.get("/health/system")
+async def system_health_check() -> Dict[str, Any]:
+    """
+    Comprehensive system health check with detailed information.
+    
+    Returns:
+        Dict[str, Any]: Detailed system health status
+    """
+    logger.info("🔍 System health check requested")
+    
+    try:
+        system_health = get_system_health()
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "version": settings.version,
+            "environment": "development" if settings.debug else "production",
+            "detailed_health": system_health,
+            "uptime_info": {
+                "process_start_time": datetime.now().isoformat(),  # This would be actual start time
+                "current_time": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"System health check failed: {str(e)}")
+        
+        return {
+            "status": "unhealthy",
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e),
+            "version": settings.version
+        }
+
+
+@app.get("/health/security")
+async def security_audit() -> Dict[str, Any]:
+    """
+    Security audit endpoint for compliance checking.
+    
+    Returns:
+        Dict[str, Any]: Security audit report
+    """
+    logger.info("🔒 Security audit requested")
+    
+    try:
+        # Generate security audit report
+        audit_report = audit_security_practices(".")
+        
+        # Get recent security events
+        recent_events = security_event_logger.get_security_events(hours=24)
+        
+        return {
+            "status": "completed",
+            "timestamp": datetime.now().isoformat(),
+            "audit_report": audit_report,
+            "recent_security_events": len(recent_events),
+            "security_score": audit_report["summary"]["overall_score"],
+            "recommendations": audit_report["recommendations"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Security audit failed: {str(e)}")
+        
+        return {
+            "status": "failed",
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e)
+        }
 
 
 @app.get("/")

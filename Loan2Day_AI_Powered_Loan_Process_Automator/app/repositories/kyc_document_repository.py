@@ -179,8 +179,8 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
         logger.debug(f"Getting KYC documents by SGS score range: {min_score} - {max_score}")
         
         # Validate score range (LQM Standard: Decimal validation)
-        if min_score < Decimal('0') or max_score > Decimal('100'):
-            raise ValidationError("SGS score must be between 0 and 100")
+        if min_score < Decimal('0') or max_score > Decimal('1'):
+            raise ValidationError("SGS score must be between 0 and 1")
         if min_score > max_score:
             raise ValidationError("Minimum score cannot be greater than maximum score")
         
@@ -189,11 +189,11 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
                 select(KYCDocument)
                 .where(
                     and_(
-                        KYCDocument.sgs_security_score >= min_score,
-                        KYCDocument.sgs_security_score <= max_score
+                        KYCDocument.sgs_score >= min_score,
+                        KYCDocument.sgs_score <= max_score
                     )
                 )
-                .order_by(desc(KYCDocument.sgs_security_score))
+                .order_by(desc(KYCDocument.sgs_score))
                 .limit(limit)
             )
             documents = result.scalars().all()
@@ -230,8 +230,8 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
         logger.debug(f"Getting KYC documents by SBEF trust score range: {min_trust_score} - {max_trust_score}")
         
         # Validate trust score range (LQM Standard: Decimal validation)
-        if min_trust_score < Decimal('0') or max_trust_score > Decimal('100'):
-            raise ValidationError("SBEF trust score must be between 0 and 100")
+        if min_trust_score < Decimal('0') or max_trust_score > Decimal('1'):
+            raise ValidationError("SBEF trust score must be between 0 and 1")
         if min_trust_score > max_trust_score:
             raise ValidationError("Minimum trust score cannot be greater than maximum trust score")
         
@@ -240,11 +240,11 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
                 select(KYCDocument)
                 .where(
                     and_(
-                        KYCDocument.sbef_trust_score >= min_trust_score,
-                        KYCDocument.sbef_trust_score <= max_trust_score
+                        KYCDocument.trust_score >= min_trust_score,
+                        KYCDocument.trust_score <= max_trust_score
                     )
                 )
-                .order_by(desc(KYCDocument.sbef_trust_score))
+                .order_by(desc(KYCDocument.trust_score))
                 .limit(limit)
             )
             documents = result.scalars().all()
@@ -282,7 +282,7 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
         logger.debug(f"Updating verification status for document: {document_id}")
         
         # Validate status (following Agent State pattern)
-        valid_statuses = ['pending', 'verified', 'rejected', 'requires_review', 'expired']
+        valid_statuses = ['PENDING', 'VERIFIED', 'REJECTED', 'SUSPICIOUS']
         if new_status not in valid_statuses:
             raise ValidationError(f"Invalid verification status: {new_status}")
         
@@ -294,10 +294,10 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
             
             # Update verification status and timestamp
             document.verification_status = new_status
-            document.verification_timestamp = datetime.utcnow()
+            document.verified_at = datetime.now()
             
             if verification_notes:
-                document.verification_notes = verification_notes
+                document.processing_notes = verification_notes
             
             await db.commit()
             await db.refresh(document)
@@ -336,8 +336,8 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
         logger.debug(f"Updating SGS security score for document: {document_id}")
         
         # Validate SGS score (LQM Standard: Decimal validation)
-        if sgs_score < Decimal('0') or sgs_score > Decimal('100'):
-            raise ValidationError("SGS security score must be between 0 and 100")
+        if sgs_score < Decimal('0') or sgs_score > Decimal('1'):
+            raise ValidationError("SGS security score must be between 0 and 1")
         
         try:
             # Get existing document
@@ -345,12 +345,15 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
             if not document:
                 raise NotFoundError(f"KYC document not found: {document_id}")
             
-            # Update SGS security score and scan timestamp
-            document.sgs_security_score = sgs_score
-            document.sgs_scan_timestamp = datetime.utcnow()
+            # Update SGS security score and processing timestamp
+            document.sgs_score = sgs_score
+            document.processed_at = datetime.now()
             
+            # Store scan details in extracted_data field
             if sgs_scan_details:
-                document.sgs_scan_details = sgs_scan_details
+                current_data = document.extracted_data or {}
+                current_data['sgs_scan_details'] = sgs_scan_details
+                document.extracted_data = current_data
             
             await db.commit()
             await db.refresh(document)
@@ -389,8 +392,8 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
         logger.debug(f"Updating SBEF trust score for document: {document_id}")
         
         # Validate SBEF trust score (LQM Standard: Decimal validation)
-        if sbef_trust_score < Decimal('0') or sbef_trust_score > Decimal('100'):
-            raise ValidationError("SBEF trust score must be between 0 and 100")
+        if sbef_trust_score < Decimal('0') or sbef_trust_score > Decimal('1'):
+            raise ValidationError("SBEF trust score must be between 0 and 1")
         
         try:
             # Get existing document
@@ -398,12 +401,13 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
             if not document:
                 raise NotFoundError(f"KYC document not found: {document_id}")
             
-            # Update SBEF trust score and analysis timestamp
-            document.sbef_trust_score = sbef_trust_score
-            document.sbef_analysis_timestamp = datetime.utcnow()
+            # Update SBEF trust score and processing timestamp
+            document.trust_score = sbef_trust_score
+            document.processed_at = datetime.now()
             
+            # Store analysis details in trust_score_details field
             if sbef_analysis_details:
-                document.sbef_analysis_details = sbef_analysis_details
+                document.trust_score_details = sbef_analysis_details
             
             await db.commit()
             await db.refresh(document)
@@ -452,11 +456,11 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
                 raise NotFoundError(f"KYC document not found: {document_id}")
             
             # Update OCR data and processing timestamp
-            document.ocr_extracted_text = ocr_extracted_text.strip()
-            document.ocr_processing_timestamp = datetime.utcnow()
+            document.ocr_text = ocr_extracted_text.strip()
+            document.processed_at = datetime.now()
             
             if structured_data:
-                document.structured_data = structured_data
+                document.extracted_data = structured_data
             
             await db.commit()
             await db.refresh(document)
@@ -489,7 +493,7 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
         try:
             result = await db.execute(
                 select(KYCDocument)
-                .where(KYCDocument.verification_status == 'pending')
+                .where(KYCDocument.verification_status == 'PENDING')
                 .order_by(asc(KYCDocument.created_at))  # FIFO processing
                 .limit(limit)
             )
@@ -505,8 +509,8 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
     async def get_high_risk_documents(
         self,
         db: AsyncSession,
-        sgs_threshold: Decimal = Decimal('30'),
-        sbef_threshold: Decimal = Decimal('40'),
+        sgs_threshold: Decimal = Decimal('0.3'),
+        sbef_threshold: Decimal = Decimal('0.4'),
         limit: int = 100
     ) -> List[KYCDocument]:
         """
@@ -528,13 +532,13 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
                 select(KYCDocument)
                 .where(
                     or_(
-                        KYCDocument.sgs_security_score < sgs_threshold,
-                        KYCDocument.sbef_trust_score < sbef_threshold
+                        KYCDocument.sgs_score < sgs_threshold,
+                        KYCDocument.trust_score < sbef_threshold
                     )
                 )
                 .order_by(
-                    asc(KYCDocument.sgs_security_score),
-                    asc(KYCDocument.sbef_trust_score)
+                    asc(KYCDocument.sgs_score),
+                    asc(KYCDocument.trust_score)
                 )
                 .limit(limit)
             )
@@ -662,7 +666,7 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
         if not document_ids:
             raise ValidationError("Document IDs list cannot be empty")
         
-        valid_statuses = ['pending', 'verified', 'rejected', 'requires_review', 'expired']
+        valid_statuses = ['PENDING', 'VERIFIED', 'REJECTED', 'SUSPICIOUS']
         if new_status not in valid_statuses:
             raise ValidationError(f"Invalid verification status: {new_status}")
         
@@ -681,9 +685,9 @@ class KYCDocumentRepository(BaseRepository[KYCDocument, KYCDocumentModel, KYCDoc
             # Update all documents
             for document in documents:
                 document.verification_status = new_status
-                document.verification_timestamp = datetime.utcnow()
+                document.verified_at = datetime.now()
                 if verification_notes:
-                    document.verification_notes = verification_notes
+                    document.processing_notes = verification_notes
             
             await db.commit()
             

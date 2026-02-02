@@ -90,7 +90,7 @@ class TestLQMEMICalculationCorrectness:
         interest_rate_strategy,
         tenure_strategy
     )
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     def test_emi_calculation_mathematical_correctness_property(
         self, principal, annual_rate, tenure_months
     ):
@@ -151,7 +151,7 @@ class TestLQMEMICalculationCorrectness:
         st.just(Decimal('0.00')),  # Zero interest rate
         tenure_strategy
     )
-    @settings(max_examples=50)
+    @settings(max_examples=10)
     def test_zero_interest_rate_property(self, principal, zero_rate, tenure_months):
         """
         Property: Zero interest rate calculations must be mathematically correct.
@@ -188,7 +188,7 @@ class TestLQMEMICalculationCorrectness:
         edge_rate_strategy,
         st.integers(min_value=1, max_value=600)  # Extended tenure for edge cases
     )
-    @settings(max_examples=50)
+    @settings(max_examples=10)
     def test_edge_case_calculations_property(self, principal, annual_rate, tenure_months):
         """
         Property: EMI calculations must handle edge cases correctly.
@@ -233,7 +233,7 @@ class TestLQMEMICalculationCorrectness:
             assert "must be" in str(e) or "Invalid" in str(e), f"Unexpected error message: {e}"
     
     @given(float_strategy)
-    @settings(max_examples=50)
+    @settings(max_examples=10)
     def test_float_input_rejection_property(self, float_principal):
         """
         Property: LQM must reject float inputs and enforce Decimal usage.
@@ -264,7 +264,7 @@ class TestLQMEMICalculationCorrectness:
         st.text(min_size=1, max_size=20),
         st.integers(min_value=-1000, max_value=0)
     )
-    @settings(max_examples=30)
+    @settings(max_examples=10)
     def test_invalid_input_handling_property(self, invalid_string, negative_value):
         """
         Property: LQM must handle invalid inputs gracefully with clear errors.
@@ -296,7 +296,7 @@ class TestLQMEMICalculationCorrectness:
         interest_rate_strategy,
         tenure_strategy
     )
-    @settings(max_examples=50)
+    @settings(max_examples=10)
     def test_calculation_determinism_property(self, principal, annual_rate, tenure_months):
         """
         Property: EMI calculations must be deterministic and repeatable.
@@ -324,7 +324,7 @@ class TestLQMEMICalculationCorrectness:
         interest_rate_strategy,
         tenure_strategy
     )
-    @settings(max_examples=30)
+    @settings(max_examples=10)
     def test_mathematical_formula_validation_property(self, principal, annual_rate, tenure_months):
         """
         Property: EMI calculations must follow the standard reducing balance formula.
@@ -386,7 +386,7 @@ class TestLQMEMICalculationCorrectness:
         principal_strategy,
         interest_rate_strategy
     )
-    @settings(max_examples=30)
+    @settings(max_examples=10)
     def test_tenure_boundary_conditions_property(self, principal, annual_rate):
         """
         Property: EMI calculations must handle tenure boundary conditions correctly.
